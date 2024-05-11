@@ -30,7 +30,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer{
     }
     @Override
     public boolean configureMessageConverters(List<MessageConverter> messageConverters) {
-            
+
         DefaultContentTypeResolver resolver = new DefaultContentTypeResolver();
             resolver.setDefaultMimeType(APPLICATION_JSON);
             MappingJackson2MessageConverter converter = new MappingJackson2MessageConverter();
