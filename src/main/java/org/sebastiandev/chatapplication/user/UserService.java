@@ -22,7 +22,7 @@ public class UserService {
         }
     }
     public List<User> findConnectedUsers() {
-        return userRepository.finfAllByStatus(Status.ONLINE);
+        return userRepository.findAllByStatus(Status.ONLINE);
     }
 
 }
