@@ -1,2 +1,9 @@
 # ChatApplication
- A java WebSocketApplication with realtime chat
+Spring boot websocket backend and reactjs client
+
+Server:
+    - Spring boot Websocket
+
+Client
+    - ReactJS
+
