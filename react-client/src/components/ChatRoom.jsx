@@ -1,82 +1,69 @@
-/**
- * ChatRoom Component
- *
- * This component is responsible for managing the chat room functionality of the application.
- * It uses the stompjs and sockjs-client libraries to establish a WebSocket connection with the server.
- *
- * @module ChatRoom
- */
-
-import React, { useEffect, useState } from 'react'
-import {over} from 'stompjs';
+import React, { useEffect, useState } from 'react';
+import { over } from 'stompjs';
 import SockJS from 'sockjs-client';
+import './ChatRoom.css';
 
-var stompClient =null;
+var stompClient = null;
 
-/**
- * ChatRoom functional component
- *
- * @returns {JSX.Element} The rendered ChatRoom component
- */
 const ChatRoom = () => {
-    // State variables
     const [privateChats, setPrivateChats] = useState(new Map());
     const [publicChats, setPublicChats] = useState([]);
-    const [tab,setTab] =useState("CHATROOM");
+    const [tab, setTab] = useState("CHATROOM");
     const [userData, setUserData] = useState({
         username: '',
         receivername: '',
         connected: false,
         message: ''
     });
+    const [avatarColors, setAvatarColors] = useState({});
 
-    // Effect hook to log userData changes
     useEffect(() => {
         console.log(userData);
     }, [userData]);
 
-    /**
-     * Establishes a WebSocket connection with the server
-     */
-    const connect =()=>{
+    const generateRandomColor = () => {
+        const letters = '0123456789ABCDEF';
+        let color = '#';
+        for (let i = 0; i < 6; i++) {
+            color += letters[Math.floor(Math.random() * 16)];
+        }
+        return color;
+    };
+
+    const connect = () => {
         let Sock = new SockJS('http://localhost:8080/ws');
         stompClient = over(Sock);
-        stompClient.connect({},onConnected, onError);
-    }
+        stompClient.connect({}, onConnected, onError);
+    };
 
-    /**
-     * Callback function to handle successful connection
-     */
     const onConnected = () => {
-        setUserData({...userData,"connected": true});
+        setUserData({ ...userData, "connected": true });
         stompClient.subscribe('/chatroom/public', onMessageReceived);
-        stompClient.subscribe('/user/'+userData.username+'/private', onPrivateMessage);
+        stompClient.subscribe('/user/' + userData.username + '/private', onPrivateMessage);
         userJoin();
-    }
+    };
 
-    /**
-     * Sends a join message to the server
-     */
-    const userJoin=()=>{
+    const userJoin = () => {
         var chatMessage = {
             senderName: userData.username,
-            status:"JOIN"
+            status: "JOIN"
         };
         stompClient.send("/app/message", {}, JSON.stringify(chatMessage));
-    }
+    };
 
-    /**
-     * Callback function to handle received public messages
-     *
-     * @param {Object} payload - The received message payload
-     */
-    const onMessageReceived = (payload)=>{
+    const onMessageReceived = (payload) => {
         var payloadData = JSON.parse(payload.body);
-        switch(payloadData.status){
+        switch (payloadData.status) {
             case "JOIN":
-                if(!privateChats.get(payloadData.senderName)){
-                    privateChats.set(payloadData.senderName,[]);
+                if (!privateChats.get(payloadData.senderName)) {
+                    privateChats.set(payloadData.senderName, []);
                     setPrivateChats(new Map(privateChats));
+                }
+                if (!avatarColors[payloadData.senderName]) {
+                    setAvatarColors(prevColors => ({
+                        ...prevColors,
+                        [payloadData.senderName]: generateRandomColor()
+                    }));
                 }
                 break;
             case "MESSAGE":
@@ -84,153 +71,139 @@ const ChatRoom = () => {
                 setPublicChats([...publicChats]);
                 break;
         }
-    }
+    };
 
-    /**
-     * Callback function to handle received private messages
-     *
-     * @param {Object} payload - The received message payload
-     */
-    const onPrivateMessage = (payload)=>{
+    const onPrivateMessage = (payload) => {
         console.log(payload);
         var payloadData = JSON.parse(payload.body);
-        if(privateChats.get(payloadData.senderName)){
+        if (privateChats.get(payloadData.senderName)) {
             privateChats.get(payloadData.senderName).push(payloadData);
             setPrivateChats(new Map(privateChats));
-        }else{
-            let list =[];
+        } else {
+            let list = [];
             list.push(payloadData);
-            privateChats.set(payloadData.senderName,list);
+            privateChats.set(payloadData.senderName, list);
             setPrivateChats(new Map(privateChats));
         }
-    }
+        if (!avatarColors[payloadData.senderName]) {
+            setAvatarColors(prevColors => ({
+                ...prevColors,
+                [payloadData.senderName]: generateRandomColor()
+            }));
+        }
+    };
 
-    /**
-     * Callback function to handle connection errors
-     *
-     * @param {Error} err - The error object
-     */
     const onError = (err) => {
         console.log(err);
-    }
+    };
 
-    /**
-     * Handles changes to the message input field
-     *
-     * @param {Event} event - The input change event
-     */
-    const handleMessage =(event)=>{
-        const {value}=event.target;
-        setUserData({...userData,"message": value});
-    }
+    const handleMessage = (event) => {
+        const { value } = event.target;
+        setUserData({ ...userData, "message": value });
+    };
 
-    /**
-     * Sends the current message to the server
-     */
-    const sendValue=()=>{
+    const sendValue = () => {
         if (stompClient) {
             var chatMessage = {
                 senderName: userData.username,
                 message: userData.message,
-                status:"MESSAGE"
+                status: "MESSAGE"
             };
             console.log(chatMessage);
             stompClient.send("/app/message", {}, JSON.stringify(chatMessage));
-            setUserData({...userData,"message": ""});
+            setUserData({ ...userData, "message": "" });
         }
-    }
+    };
 
-    /**
-     * Sends a private message to the server
-     */
-    const sendPrivateValue=()=>{
+    const sendPrivateValue = () => {
         if (stompClient) {
             var chatMessage = {
                 senderName: userData.username,
-                receiverName:tab,
+                receiverName: tab,
                 message: userData.message,
-                status:"MESSAGE"
+                status: "MESSAGE"
             };
 
-            if(userData.username !== tab){
+            if (userData.username !== tab) {
                 privateChats.get(tab).push(chatMessage);
                 setPrivateChats(new Map(privateChats));
             }
             stompClient.send("/app/private-message", {}, JSON.stringify(chatMessage));
-            setUserData({...userData,"message": ""});
+            setUserData({ ...userData, "message": "" });
         }
-    }
+    };
 
-    /**
-     * Handles changes to the username input field
-     *
-     * @param {Event} event - The input change event
-     */
-    const handleUsername=(event)=>{
-        const {value}=event.target;
-        setUserData({...userData,"username": value});
-    }
+    const handleUsername = (event) => {
+        const { value } = event.target;
+        setUserData({ ...userData, "username": value });
+    };
 
-    /**
-     * Registers the user and establishes a connection with the server
-     */
-    const registerUser=()=>{
-        connect();
-    }
+    const registerUser = () => {
+        if (userData.username.trim() !== "") {
+            connect();
+        } else {
+            alert("Username cannot be empty");
+        }
+    };
 
-    // Render the ChatRoom component
     return (
         <div className="container">
-            {userData.connected?
+            <h2>Chat Demo using Websockets</h2>
+            {userData.connected ?
                 <div className="chat-box">
                     <div className="member-list">
                         <ul>
-                            <li onClick={()=>{setTab("CHATROOM")}} className={`member ${tab==="CHATROOM" && "active"}`}>Chatroom</li>
-                            {[...privateChats.keys()].map((name,index)=>(
-                                <li onClick={()=>{setTab(name)}} className={`member ${tab===name && "active"}`} key={index}>{name}</li>
+                            <li onClick={() => { setTab("CHATROOM") }} className={`member ${tab === "CHATROOM" && "active"}`}>Chatroom</li>
+                            {[...privateChats.keys()].map((name, index) => (
+                                <li onClick={() => { setTab(name) }} className={`member ${tab === name && "active"}`} key={index}>{name}</li>
                             ))}
                         </ul>
                     </div>
-                    {tab==="CHATROOM" && <div className="chat-content">
+                    {tab === "CHATROOM" && <div className="chat-content">
                         <ul className="chat-messages">
-                            {publicChats.map((chat,index)=>(
+                            {publicChats.map((chat, index) => (
                                 <li className={`message ${chat.senderName === userData.username && "self"}`} key={index}>
-                                    {chat.senderName !== userData.username && <div className="avatar">{chat.senderName}</div>}
-                                    <div className="message-data">{chat.message}</div>
-                                    {chat.senderName === userData.username && <div className="avatar self">{chat.senderName}</div>}
+                                    {chat.senderName !== userData.username && <div className="avatar" style={{ backgroundColor: avatarColors[chat.senderName] }}>{chat.senderName[0].toUpperCase()}</div>}
+                                    <div className="message-info">
+                                        <div className="sender-name">{chat.senderName}</div>
+                                        <div className="message-data">{chat.message}</div>
+                                    </div>
+                                    {chat.senderName === userData.username && <div className="avatar self" style={{ backgroundColor: avatarColors[userData.username] }}>{chat.senderName[0].toUpperCase()}</div>}
                                 </li>
                             ))}
                         </ul>
 
                         <div className="send-message">
                             <input type="text" className="input-message" placeholder="enter the public message" value={userData.message} onChange={handleMessage}
-                                   onKeyPress={(e) => {
-                                       if (e.key === 'Enter') {  // Verifica se a tecla pressionada é Enter
-                                           sendValue();  // Chama a função registerUser quando Enter for pressionado
-                                       }
-                                   }}/>
+                                onKeyPress={(e) => {
+                                    if (e.key === 'Enter') {
+                                        sendValue();
+                                    }
+                                }} />
                             <button type="button" className="send-button" onClick={sendValue}>send</button>
                         </div>
                     </div>}
-                    {tab!=="CHATROOM" && <div className="chat-content">
+                    {tab !== "CHATROOM" && <div className="chat-content">
                         <ul className="chat-messages">
-                            {[...privateChats.get(tab)].map((chat,index)=>(
+                            {[...privateChats.get(tab)].map((chat, index) => (
                                 <li className={`message ${chat.senderName === userData.username && "self"}`} key={index}>
-                                    {chat.senderName !== userData.username && <div className="avatar">{chat.senderName}</div>}
-                                    <div className="message-data">{chat.message}</div>
-                                    {chat.senderName === userData.username && <div className="avatar self">{chat.senderName}</div>}
+                                    {chat.senderName !== userData.username && <div className="avatar" style={{ backgroundColor: avatarColors[chat.senderName] }}>{chat.senderName[0].toUpperCase()}</div>}
+                                    <div className="message-info">
+                                        <div className="sender-name">{chat.senderName}</div>
+                                        <div className="message-data">{chat.message}</div>
+                                    </div>
+                                    {chat.senderName === userData.username && <div className="avatar self" style={{ backgroundColor: avatarColors[userData.username] }}>{chat.senderName[0].toUpperCase()}</div>}
                                 </li>
                             ))}
                         </ul>
 
                         <div className="send-message">
-                            <input type="text" className="input-message" placeholder="enter the  private message" value={userData.message} onChange={handleMessage}
-                                   onKeyPress={(e) => {
-                                       if (e.key === 'Enter') {  // Verifica se a tecla pressionada é Enter
-                                           sendPrivateValue();  // Chama a função registerUser quando Enter for pressionado
-                                       }
-                                   }}
-                            />
+                            <input type="text" className="input-message" placeholder="enter the private message" value={userData.message} onChange={handleMessage}
+                                onKeyPress={(e) => {
+                                    if (e.key === 'Enter') {
+                                        sendPrivateValue();
+                                    }
+                                }} />
                             <button type="button" className="send-button" onClick={sendPrivateValue}>send</button>
                         </div>
                     </div>}
@@ -245,8 +218,8 @@ const ChatRoom = () => {
                         onChange={handleUsername}
                         margin="normal"
                         onKeyPress={(e) => {
-                            if (e.key === 'Enter') {  // Verifica se a tecla pressionada é Enter
-                                registerUser();  // Chama a função registerUser quando Enter for pressionado
+                            if (e.key === 'Enter') {
+                                registerUser();
                             }
                         }}
                     />
@@ -255,7 +228,7 @@ const ChatRoom = () => {
                     </button>
                 </div>}
         </div>
-    )
+    );
 }
 
 export default ChatRoom;
