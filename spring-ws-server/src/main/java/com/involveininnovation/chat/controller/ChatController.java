@@ -1,6 +1,8 @@
 package com.involveininnovation.chat.controller;
 
 import com.involveininnovation.chat.model.Message;
+import com.involveininnovation.chat.model.MessageEntity;
+import com.involveininnovation.chat.repository.MessageRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
@@ -8,43 +10,39 @@ import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
-/**
- * ChatController is a controller class that handles incoming chat messages.
- * It uses the SimpMessagingTemplate for sending messages to specific users.
- */
+import java.util.Date;
+
 @Controller
 public class ChatController {
 
-    /**
-     * The SimpMessagingTemplate is used to send messages to specific users.
-     */
     @Autowired
     private SimpMessagingTemplate simpMessagingTemplate;
 
-    /**
-     * This method is mapped to "/message" and sends the received message to "/chatroom/public".
-     * It receives a Message object as payload and returns the same message.
-     *
-     * @param message the incoming message.
-     * @return the same message that was received.
-     */
+    @Autowired
+    private MessageRepository messageRepository;
+
     @MessageMapping("/message")
     @SendTo("/chatroom/public")
-    public Message receiveMessage(@Payload Message message){
+    public Message receiveMessage(@Payload Message message) {
+        saveMessageToDatabase(message);
         return message;
     }
 
-    /**
-     * This method is mapped to "/private-message" and sends the received message to a specific user.
-     * It receives a Message object as payload, sends the message to the receiver specified in the message, and returns the same message.
-     *
-     * @param message the incoming message.
-     * @return the same message that was received.
-     */
     @MessageMapping("/private-message")
-    public Message recMessage(@Payload Message message){
-        simpMessagingTemplate.convertAndSendToUser(message.getReceiverName(),"/private",message);
-        System.out.println(message.toString());
+    public Message recMessage(@Payload Message message) {
+        simpMessagingTemplate.convertAndSendToUser(message.getReceiverName(), "/private", message);
+        saveMessageToDatabase(message);
         return message;
+    }
+
+    private void saveMessageToDatabase(Message message) {
+        MessageEntity messageEntity = new MessageEntity();
+        messageEntity.setSenderName(message.getSenderName());
+        messageEntity.setReceiverName(message.getReceiverName());
+        messageEntity.setMessage(message.getMessage());
+        messageEntity.setStatus(message.getStatus());
+        messageEntity.setDate(new Date());  // Definindo a data como o momento atual
+
+        messageRepository.save(messageEntity);  // Salvando a mensagem no banco de dados
     }
 }
