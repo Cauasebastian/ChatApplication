@@ -24,12 +24,14 @@ public class ChatController {
     @MessageMapping("/message")
     @SendTo("/chatroom/public")
     public Message receiveMessage(@Payload Message message) {
+        message.setIsPrivate(false);
         saveMessageToDatabase(message);
         return message;
     }
 
     @MessageMapping("/private-message")
     public Message recMessage(@Payload Message message) {
+        message.setIsPrivate(true);
         simpMessagingTemplate.convertAndSendToUser(message.getReceiverName(), "/private", message);
         saveMessageToDatabase(message);
         return message;
@@ -41,8 +43,9 @@ public class ChatController {
         messageEntity.setReceiverName(message.getReceiverName());
         messageEntity.setMessage(message.getMessage());
         messageEntity.setStatus(message.getStatus());
-        messageEntity.setDate(new Date());  // Definindo a data como o momento atual
+        messageEntity.setIsPrivate(message.getIsPrivate());
+        messageEntity.setDate(new Date());
 
-        messageRepository.save(messageEntity);  // Salvando a mensagem no banco de dados
+        messageRepository.save(messageEntity);
     }
 }

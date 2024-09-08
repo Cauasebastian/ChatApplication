@@ -1,8 +1,6 @@
 package com.involveininnovation.chat.model;
 
-import com.involveininnovation.chat.model.Status;
 import lombok.*;
-
 import javax.persistence.*;
 import java.util.Date;
 
@@ -28,4 +26,6 @@ public class MessageEntity {
 
     @Enumerated(EnumType.STRING)
     private Status status;
+
+    private Boolean isPrivate; // Flag para distinguir mensagens privadas e públicas
 }

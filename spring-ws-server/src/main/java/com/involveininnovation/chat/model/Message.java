@@ -13,6 +13,7 @@ public class Message {
     private String senderName;
     private String receiverName;
     private String message;
-    private String date;
+    private Date date;
     private Status status;
+    private Boolean isPrivate; // Flag para distinguir mensagens privadas e públicas
 }
