@@ -26,6 +26,8 @@ public class SecurityConfig {
                 .csrf().disable() // Disable CSRF protection for simplicity
                 .authorizeRequests()
                 .antMatchers("/auth/**","/ws/**").permitAll() // Allow public access to auth endpoints
+                .antMatchers("/chat/**").permitAll() // Allow public access to chat endpoints
+                .antMatchers("/messages/**").permitAll() // Allow public access to messages endpoints
                 .anyRequest().authenticated();
         return http.build();
     }

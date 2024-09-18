@@ -41,6 +41,64 @@ const ChatRoom = () => {
         stompClient.subscribe('/chatroom/public', onMessageReceived);
         stompClient.subscribe('/user/' + userData.username + '/private', onPrivateMessage);
         userJoin();
+
+        // Fetch old messages
+        fetchOldMessages();
+    };
+
+    const fetchOldMessages = () => {
+        // Fetch public messages
+        fetch('http://localhost:8080/messages/public')
+            .then(res => res.json())
+            .then(data => {
+                // Sort messages by date
+                data.sort((a, b) => new Date(a.date) - new Date(b.date));
+                setPublicChats(data);
+
+                // Set avatar colors for public chat users
+                data.forEach(message => {
+                    if (!avatarColors[message.senderName]) {
+                        setAvatarColors(prevColors => ({
+                            ...prevColors,
+                            [message.senderName]: generateRandomColor()
+                        }));
+                    }
+                });
+            })
+            .catch(error => console.error('Error fetching public messages:', error));
+
+        // Fetch private messages for the user
+        fetch(`http://localhost:8080/messages/private/${userData.username}`)
+            .then(res => res.json())
+            .then(data => {
+                const chats = new Map();
+
+                data.forEach(message => {
+                    const chatUser = message.senderName === userData.username ? message.receiverName : message.senderName;
+
+                    if (chats.has(chatUser)) {
+                        chats.get(chatUser).push(message);
+                    } else {
+                        chats.set(chatUser, [message]);
+                    }
+
+                    // Set avatar colors for private chat users
+                    if (!avatarColors[chatUser]) {
+                        setAvatarColors(prevColors => ({
+                            ...prevColors,
+                            [chatUser]: generateRandomColor()
+                        }));
+                    }
+                });
+
+                // Sort messages in each private chat by date
+                chats.forEach((messages, user) => {
+                    messages.sort((a, b) => new Date(a.date) - new Date(b.date));
+                });
+
+                setPrivateChats(chats);
+            })
+            .catch(error => console.error('Error fetching private messages:', error));
     };
 
     const userJoin = () => {
@@ -55,7 +113,7 @@ const ChatRoom = () => {
         var payloadData = JSON.parse(payload.body);
         switch (payloadData.status) {
             case "JOIN":
-                if (!privateChats.get(payloadData.senderName)) {
+                if (!privateChats.get(payloadData.senderName) && payloadData.senderName !== userData.username) {
                     privateChats.set(payloadData.senderName, []);
                     setPrivateChats(new Map(privateChats));
                 }
@@ -70,25 +128,26 @@ const ChatRoom = () => {
                 publicChats.push(payloadData);
                 setPublicChats([...publicChats]);
                 break;
+            default:
+                break;
         }
     };
 
     const onPrivateMessage = (payload) => {
-        console.log(payload);
         var payloadData = JSON.parse(payload.body);
-        if (privateChats.get(payloadData.senderName)) {
-            privateChats.get(payloadData.senderName).push(payloadData);
-            setPrivateChats(new Map(privateChats));
+        const sender = payloadData.senderName;
+
+        if (privateChats.get(sender)) {
+            privateChats.get(sender).push(payloadData);
         } else {
-            let list = [];
-            list.push(payloadData);
-            privateChats.set(payloadData.senderName, list);
-            setPrivateChats(new Map(privateChats));
+            privateChats.set(sender, [payloadData]);
         }
-        if (!avatarColors[payloadData.senderName]) {
+        setPrivateChats(new Map(privateChats));
+
+        if (!avatarColors[sender]) {
             setAvatarColors(prevColors => ({
                 ...prevColors,
-                [payloadData.senderName]: generateRandomColor()
+                [sender]: generateRandomColor()
             }));
         }
     };
@@ -103,20 +162,19 @@ const ChatRoom = () => {
     };
 
     const sendValue = () => {
-        if (stompClient) {
+        if (stompClient && userData.message.trim() !== "") {
             var chatMessage = {
                 senderName: userData.username,
                 message: userData.message,
                 status: "MESSAGE"
             };
-            console.log(chatMessage);
             stompClient.send("/app/message", {}, JSON.stringify(chatMessage));
             setUserData({ ...userData, "message": "" });
         }
     };
 
     const sendPrivateValue = () => {
-        if (stompClient) {
+        if (stompClient && userData.message.trim() !== "") {
             var chatMessage = {
                 senderName: userData.username,
                 receiverName: tab,
@@ -125,8 +183,13 @@ const ChatRoom = () => {
             };
 
             if (userData.username !== tab) {
-                privateChats.get(tab).push(chatMessage);
-                setPrivateChats(new Map(privateChats));
+                if (privateChats.get(tab)) {
+                    privateChats.get(tab).push(chatMessage);
+                    setPrivateChats(new Map(privateChats));
+                } else {
+                    privateChats.set(tab, [chatMessage]);
+                    setPrivateChats(new Map(privateChats));
+                }
             }
             stompClient.send("/app/private-message", {}, JSON.stringify(chatMessage));
             setUserData({ ...userData, "message": "" });
@@ -175,11 +238,11 @@ const ChatRoom = () => {
 
                         <div className="send-message">
                             <input type="text" className="input-message" placeholder="enter the public message" value={userData.message} onChange={handleMessage}
-                                onKeyPress={(e) => {
-                                    if (e.key === 'Enter') {
-                                        sendValue();
-                                    }
-                                }} />
+                                   onKeyPress={(e) => {
+                                       if (e.key === 'Enter') {
+                                           sendValue();
+                                       }
+                                   }} />
                             <button type="button" className="send-button" onClick={sendValue}>send</button>
                         </div>
                     </div>}
@@ -199,11 +262,11 @@ const ChatRoom = () => {
 
                         <div className="send-message">
                             <input type="text" className="input-message" placeholder="enter the private message" value={userData.message} onChange={handleMessage}
-                                onKeyPress={(e) => {
-                                    if (e.key === 'Enter') {
-                                        sendPrivateValue();
-                                    }
-                                }} />
+                                   onKeyPress={(e) => {
+                                       if (e.key === 'Enter') {
+                                           sendPrivateValue();
+                                       }
+                                   }} />
                             <button type="button" className="send-button" onClick={sendPrivateValue}>send</button>
                         </div>
                     </div>}
