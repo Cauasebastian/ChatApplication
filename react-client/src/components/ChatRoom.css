@@ -36,6 +36,9 @@
     flex: 1;
     overflow-y: auto;
     padding: 10px;
+    list-style-type: none; /* Remove estilo de lista */
+    margin: 0; /* Remove margens extras */
+    padding: 0; /* Remove padding extra */
 }
 
 .send-message {
@@ -78,7 +81,6 @@
 .sender-name {
     font-weight: bold;
     margin-right: 10px;
-    margin-bottom: 1px solid black;
 }
 
 .message .avatar {
@@ -100,6 +102,17 @@
 .message.self .avatar {
     margin-left: 10px;
     margin-right: 0;
+}
+
+/* Estilos de notificação (JOIN/LEAVE) */
+.notification {
+    font-style: italic;
+    color: #888;
+    margin: 5px 0; /* Ajuste de margens */
+    padding: 5px 10px; /* Ajuste de padding */
+    text-align: center; /* Centralizar o texto */
+    border: none; /* Remove qualquer borda */
+    background: transparent; /* Remove fundo */
 }
 
 /* Ajustes de fonte para telas menores */

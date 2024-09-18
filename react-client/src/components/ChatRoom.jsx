@@ -3,7 +3,7 @@ import { over } from 'stompjs';
 import SockJS from 'sockjs-client';
 import './ChatRoom.css';
 
-var stompClient = null;
+let stompClient = null;
 
 const ChatRoom = () => {
     const [privateChats, setPrivateChats] = useState(new Map());
@@ -16,6 +16,7 @@ const ChatRoom = () => {
         message: ''
     });
     const [avatarColors, setAvatarColors] = useState({});
+    const [connectedUsers, setConnectedUsers] = useState([]);
 
     useEffect(() => {
         console.log(userData);
@@ -31,7 +32,7 @@ const ChatRoom = () => {
     };
 
     const connect = () => {
-        let Sock = new SockJS('http://localhost:8080/ws');
+        const Sock = new SockJS('http://localhost:8080/ws');
         stompClient = over(Sock);
         stompClient.connect({
             'Authorization': 'Basic ' + btoa(`${userData.username}:${userData.password}`)
@@ -39,19 +40,19 @@ const ChatRoom = () => {
     };
 
     const onConnected = () => {
-        setUserData({ ...userData, "connected": true });
+        setUserData(prevData => ({ ...prevData, connected: true }));
         stompClient.subscribe('/chatroom/public', onMessageReceived);
         stompClient.subscribe('/user/' + userData.username + '/private', onPrivateMessage);
 
         // Enviar mensagem de JOIN
         userJoin();
 
-        // Fetch old messages
+        // Buscar mensagens antigas
         fetchOldMessages();
     };
 
     const fetchOldMessages = () => {
-        // Fetch public messages
+        // Buscar mensagens públicas
         fetch('http://localhost:8080/messages/public', {
             headers: {
                 'Authorization': 'Basic ' + btoa(`${userData.username}:${userData.password}`)
@@ -59,11 +60,11 @@ const ChatRoom = () => {
         })
             .then(res => res.json())
             .then(data => {
-                // Sort messages by date
+                // Ordenar mensagens por data
                 data.sort((a, b) => new Date(a.date) - new Date(b.date));
-                setPublicChats(data);
+                setPublicChats(prevChats => [...prevChats, ...data]);
 
-                // Set avatar colors for public chat users
+                // Definir cores de avatar para usuários das mensagens públicas
                 data.forEach(message => {
                     if (!avatarColors[message.senderName]) {
                         setAvatarColors(prevColors => ({
@@ -73,10 +74,10 @@ const ChatRoom = () => {
                     }
                 });
             })
-            .catch(error => console.error('Error fetching public messages:', error));
+            .catch(error => console.error('Erro ao buscar mensagens públicas:', error));
 
-        // Fetch private messages for the user
-        fetch(`http://localhost:8080/messages/private`, {
+        // Buscar mensagens privadas para o usuário
+        fetch('http://localhost:8080/messages/private', {
             headers: {
                 'Authorization': 'Basic ' + btoa(`${userData.username}:${userData.password}`)
             }
@@ -94,7 +95,7 @@ const ChatRoom = () => {
                         chats.set(chatUser, [message]);
                     }
 
-                    // Set avatar colors for private chat users
+                    // Definir cores de avatar para usuários das mensagens privadas
                     if (!avatarColors[chatUser]) {
                         setAvatarColors(prevColors => ({
                             ...prevColors,
@@ -103,18 +104,18 @@ const ChatRoom = () => {
                     }
                 });
 
-                // Sort messages in each private chat by date
+                // Ordenar mensagens em cada chat privado por data
                 chats.forEach((messages, user) => {
                     messages.sort((a, b) => new Date(a.date) - new Date(b.date));
                 });
 
                 setPrivateChats(chats);
             })
-            .catch(error => console.error('Error fetching private messages:', error));
+            .catch(error => console.error('Erro ao buscar mensagens privadas:', error));
     };
 
     const userJoin = () => {
-        var chatMessage = {
+        const chatMessage = {
             senderName: userData.username,
             status: "JOIN"
         };
@@ -122,7 +123,7 @@ const ChatRoom = () => {
     };
 
     const userLeave = () => {
-        var chatMessage = {
+        const chatMessage = {
             senderName: userData.username,
             status: "LEAVE"
         };
@@ -142,33 +143,54 @@ const ChatRoom = () => {
         };
     }, [userData]);
 
-    const onMessageReceived = (payload) => {
-        var payloadData = JSON.parse(payload.body);
-        switch (payloadData.status) {
-            case "JOIN":
-            case "LEAVE":
-                publicChats.push(payloadData);
-                setPublicChats([...publicChats]);
-                break;
-            case "MESSAGE":
-                publicChats.push(payloadData);
-                setPublicChats([...publicChats]);
-                break;
-            default:
-                break;
-        }
-    };
+    // Função para receber mensagens públicas
+const onMessageReceived = (payload) => {
+    const payloadData = JSON.parse(payload.body);
 
+    // Verifica se a mensagem é de JOIN ou LEAVE
+    if (payloadData.status === "JOIN") {
+        setConnectedUsers(prevUsers => {
+            if (!prevUsers.includes(payloadData.senderName)) {
+                return [...prevUsers, payloadData.senderName];
+            }
+            return prevUsers;
+        });
+
+        // Adiciona uma mensagem de notificação de que o usuário entrou
+        setPublicChats(prevChats => [...prevChats, {
+            senderName: "Sistema", // Pode ser qualquer nome para indicar uma notificação do sistema
+            message: `${payloadData.senderName} entrou no chat.`,
+            status: "NOTIFICATION"
+        }]);
+    } else if (payloadData.status === "LEAVE") {
+        setConnectedUsers(prevUsers => prevUsers.filter(user => user !== payloadData.senderName));
+
+        // Adiciona uma mensagem de notificação de que o usuário saiu
+        setPublicChats(prevChats => [...prevChats, {
+            senderName: "Sistema",
+            message: `${payloadData.senderName} saiu do chat.`,
+            status: "NOTIFICATION"
+        }]);
+    } else if (payloadData.status === "MESSAGE") {
+        setPublicChats(prevChats => [...prevChats, payloadData]);
+    }
+};
+
+
+    // Função para receber mensagens privadas
     const onPrivateMessage = (payload) => {
-        var payloadData = JSON.parse(payload.body);
+        const payloadData = JSON.parse(payload.body);
         const sender = payloadData.senderName;
 
-        if (privateChats.get(sender)) {
-            privateChats.get(sender).push(payloadData);
-        } else {
-            privateChats.set(sender, [payloadData]);
-        }
-        setPrivateChats(new Map(privateChats));
+        setPrivateChats(prevChats => {
+            const newChats = new Map(prevChats);
+            if (newChats.get(sender)) {
+                newChats.get(sender).push(payloadData);
+            } else {
+                newChats.set(sender, [payloadData]);
+            }
+            return newChats;
+        });
 
         if (!avatarColors[sender]) {
             setAvatarColors(prevColors => ({
@@ -179,29 +201,29 @@ const ChatRoom = () => {
     };
 
     const onError = (err) => {
-        console.log(err);
+        console.error('Erro no STOMP:', err);
     };
 
     const handleMessage = (event) => {
         const { value } = event.target;
-        setUserData({ ...userData, "message": value });
+        setUserData(prevData => ({ ...prevData, message: value }));
     };
 
     const sendValue = () => {
         if (stompClient && userData.message.trim() !== "") {
-            var chatMessage = {
+            const chatMessage = {
                 senderName: userData.username,
                 message: userData.message,
                 status: "MESSAGE"
             };
             stompClient.send("/app/message", {}, JSON.stringify(chatMessage));
-            setUserData({ ...userData, "message": "" });
+            setUserData(prevData => ({ ...prevData, message: "" }));
         }
     };
 
     const sendPrivateValue = () => {
         if (stompClient && userData.message.trim() !== "") {
-            var chatMessage = {
+            const chatMessage = {
                 senderName: userData.username,
                 receiverName: tab,
                 message: userData.message,
@@ -209,22 +231,24 @@ const ChatRoom = () => {
             };
 
             if (userData.username !== tab) {
-                if (privateChats.get(tab)) {
-                    privateChats.get(tab).push(chatMessage);
-                    setPrivateChats(new Map(privateChats));
-                } else {
-                    privateChats.set(tab, [chatMessage]);
-                    setPrivateChats(new Map(privateChats));
-                }
+                setPrivateChats(prevChats => {
+                    const newChats = new Map(prevChats);
+                    if (newChats.get(tab)) {
+                        newChats.get(tab).push(chatMessage);
+                    } else {
+                        newChats.set(tab, [chatMessage]);
+                    }
+                    return newChats;
+                });
             }
             stompClient.send("/app/private-message", {}, JSON.stringify(chatMessage));
-            setUserData({ ...userData, "message": "" });
+            setUserData(prevData => ({ ...prevData, message: "" }));
         }
     };
 
     const handleUsername = (event) => {
         const { value, name } = event.target;
-        setUserData({ ...userData, [name]: value });
+        setUserData(prevData => ({ ...prevData, [name]: value }));
     };
 
     const registerUser = () => {
@@ -280,14 +304,14 @@ const ChatRoom = () => {
                         <ul>
                             <li
                                 onClick={() => setTab("CHATROOM")}
-                                className={`member ${tab === "CHATROOM" && "active"}`}
+                                className={`member ${tab === "CHATROOM" ? "active" : ""}`}
                             >
                                 Chatroom
                             </li>
-                            {[...privateChats.keys()].map((name, index) => (
+                            {connectedUsers.map((name, index) => (
                                 <li
                                     onClick={() => setTab(name)}
-                                    className={`member ${tab === name && "active"}`}
+                                    className={`member ${tab === name ? "active" : ""}`}
                                     key={index}
                                 >
                                     {name}
@@ -299,48 +323,57 @@ const ChatRoom = () => {
                     {tab === "CHATROOM" && (
                         <div className="chat-content">
                             <ul className="chat-messages">
-                                {publicChats.map((chat, index) => (
-                                    <li
-                                        className={`message ${
-                                            chat.senderName === userData.username && "self"
-                                        }`}
-                                        key={index}
-                                    >
-                                        {chat.status === "MESSAGE" ? (
-                                            <>
-                                                {chat.senderName !== userData.username && (
-                                                    <div
-                                                        className="avatar"
-                                                        style={{
-                                                            backgroundColor: avatarColors[chat.senderName],
-                                                        }}
-                                                    >
-                                                        {chat.senderName[0].toUpperCase()}
-                                                    </div>
-                                                )}
-                                                <div className="message-info">
-                                                    <div className="sender-name">{chat.senderName}</div>
-                                                    <div className="message-data">{chat.message}</div>
-                                                </div>
-                                                {chat.senderName === userData.username && (
-                                                    <div
-                                                        className="avatar self"
-                                                        style={{
-                                                            backgroundColor: avatarColors[userData.username],
-                                                        }}
-                                                    >
-                                                        {chat.senderName[0].toUpperCase()}
-                                                    </div>
-                                                )}
-                                            </>
-                                        ) : (
-                                            <div className="notification">
-                                                {chat.message}
-                                            </div>
-                                        )}
-                                    </li>
-                                ))}
-                            </ul>
+    {publicChats.map((chat, index) => {
+        // Verifica se a mensagem ou notificação tem conteúdo válido
+        if (!chat.message && chat.status !== "NOTIFICATION") {
+            return null; // Não renderiza o item se não houver conteúdo
+        }
+
+        return (
+            <li
+                className={`message ${chat.senderName === userData.username ? "self" : ""}`}
+                key={index}
+            >
+                {chat.status === "MESSAGE" ? (
+                    <>
+                        {chat.senderName !== userData.username && (
+                            <div
+                                className="avatar"
+                                style={{
+                                    backgroundColor: avatarColors[chat.senderName],
+                                }}
+                            >
+                                {chat.senderName[0].toUpperCase()}
+                            </div>
+                        )}
+                        <div className="message-info">
+                            <div className="sender-name">{chat.senderName}</div>
+                            <div className="message-data">{chat.message}</div>
+                        </div>
+                        {chat.senderName === userData.username && (
+                            <div
+                                className="avatar self"
+                                style={{
+                                    backgroundColor: avatarColors[userData.username],
+                                }}
+                            >
+                                {chat.senderName[0].toUpperCase()}
+                            </div>
+                        )}
+                    </>
+                ) : (
+                    // Renderiza a notificação apenas se a mensagem não estiver vazia
+                    chat.message && (
+                        <div className="notification">
+                            {chat.message}
+                        </div>
+                    )
+                )}
+            </li>
+        );
+    })}
+</ul>
+
 
                             <div className="send-message">
                                 <input
@@ -364,40 +397,48 @@ const ChatRoom = () => {
                     {tab !== "CHATROOM" && (
                         <div className="chat-content">
                             <ul className="chat-messages">
-                                {[...privateChats.get(tab)].map((chat, index) => (
+                                {publicChats.map((chat, index) => (
                                     <li
-                                        className={`message ${
-                                            chat.senderName === userData.username && "self"
-                                        }`}
-                                        key={index}
-                                    >
-                                        {chat.senderName !== userData.username && (
-                                            <div
-                                                className="avatar"
-                                                style={{
-                                                    backgroundColor: avatarColors[chat.senderName],
-                                                }}
-                                            >
-                                                {chat.senderName[0].toUpperCase()}
-                                            </div>
-                                        )}
-                                        <div className="message-info">
-                                            <div className="sender-name">{chat.senderName}</div>
-                                            <div className="message-data">{chat.message}</div>
-                                        </div>
-                                        {chat.senderName === userData.username && (
-                                            <div
-                                                className="avatar self"
-                                                style={{
-                                                    backgroundColor: avatarColors[userData.username],
-                                                }}
-                                            >
-                                                {chat.senderName[0].toUpperCase()}
-                                            </div>
-                                        )}
-                                    </li>
-                                ))}
-                            </ul>
+                                        className={`message ${chat.senderName === userData.username ? "self" : ""}`}
+                                          key={index}
+                                             >
+                                                 {chat.status === "MESSAGE" ? (
+                                                       <>
+                                             {chat.senderName !== userData.username && (
+                        <div
+                            className="avatar"
+                            style={{
+                                backgroundColor: avatarColors[chat.senderName],
+                            }}
+                        >
+                            {chat.senderName[0].toUpperCase()}
+                        </div>
+                    )}
+                    <div className="message-info">
+                        <div className="sender-name">{chat.senderName}</div>
+                        <div className="message-data">{chat.message}</div>
+                    </div>
+                    {chat.senderName === userData.username && (
+                        <div
+                            className="avatar self"
+                            style={{
+                                backgroundColor: avatarColors[userData.username],
+                            }}
+                        >
+                            {chat.senderName[0].toUpperCase()}
+                        </div>
+                    )}
+                </>
+            ) : (
+                // Exibe notificação de JOIN ou LEAVE
+                <div className="notification">
+                    {chat.message}
+                </div>
+            )}
+        </li>
+    ))}
+</ul>
+
 
                             <div className="send-message">
                                 <input

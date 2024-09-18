@@ -1,3 +1,4 @@
+// MessageEntity.java
 package com.involveininnovation.chat.model;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
@@ -26,8 +27,9 @@ public class MessageEntity {
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
     private Date date;
 
+    @JsonFormat(shape = JsonFormat.Shape.STRING)
     @Enumerated(EnumType.STRING)
     private Status status;
 
-    private Boolean isPrivate; // Flag para distinguir mensagens privadas e públicas
+    private Boolean isPrivate;
 }

@@ -1,5 +1,7 @@
+// Message.java
 package com.involveininnovation.chat.model;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.*;
 
 import java.util.Date;
@@ -14,6 +16,9 @@ public class Message {
     private String receiverName;
     private String message;
     private Date date;
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING)
     private Status status;
-    private Boolean isPrivate; // Flag para distinguir mensagens privadas e públicas
+
+    private Boolean isPrivate;
 }
