@@ -4,9 +4,7 @@ import com.involveininnovation.chat.model.Message;
 import com.involveininnovation.chat.model.MessageEntity;
 import com.involveininnovation.chat.repository.MessageRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.messaging.handler.annotation.MessageMapping;
-import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.messaging.handler.annotation.SendTo;
+import org.springframework.messaging.handler.annotation.*;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
@@ -25,16 +23,18 @@ public class ChatController {
     @SendTo("/chatroom/public")
     public Message receiveMessage(@Payload Message message) {
         message.setIsPrivate(false);
+        if (message.getStatus().equals("JOIN") || message.getStatus().equals("LEAVE")) {
+            message.setMessage(message.getSenderName() + (message.getStatus().equals("JOIN") ? " entrou no chat" : " saiu do chat"));
+        }
         saveMessageToDatabase(message);
         return message;
     }
 
     @MessageMapping("/private-message")
-    public Message recMessage(@Payload Message message) {
+    public void recMessage(@Payload Message message) {
         message.setIsPrivate(true);
         simpMessagingTemplate.convertAndSendToUser(message.getReceiverName(), "/private", message);
         saveMessageToDatabase(message);
-        return message;
     }
 
     private void saveMessageToDatabase(Message message) {
