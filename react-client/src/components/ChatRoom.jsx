@@ -143,41 +143,35 @@ const ChatRoom = () => {
         };
     }, [userData]);
 
-    // Função para receber mensagens públicas
-const onMessageReceived = (payload) => {
-    const payloadData = JSON.parse(payload.body);
+    const onMessageReceived = (payload) => {
+        const payloadData = JSON.parse(payload.body);
 
-    // Verifica se a mensagem é de JOIN ou LEAVE
-    if (payloadData.status === "JOIN") {
-        setConnectedUsers(prevUsers => {
-            if (!prevUsers.includes(payloadData.senderName)) {
-                return [...prevUsers, payloadData.senderName];
-            }
-            return prevUsers;
-        });
+        if (payloadData.status === "JOIN") {
+            setConnectedUsers(prevUsers => {
+                if (!prevUsers.includes(payloadData.senderName)) {
+                    return [...prevUsers, payloadData.senderName];
+                }
+                return prevUsers;
+            });
 
-        // Adiciona uma mensagem de notificação de que o usuário entrou
-        setPublicChats(prevChats => [...prevChats, {
-            senderName: "Sistema", // Pode ser qualquer nome para indicar uma notificação do sistema
-            message: `${payloadData.senderName} entrou no chat.`,
-            status: "NOTIFICATION"
-        }]);
-    } else if (payloadData.status === "LEAVE") {
-        setConnectedUsers(prevUsers => prevUsers.filter(user => user !== payloadData.senderName));
+            setPublicChats(prevChats => [...prevChats, {
+                senderName: "Sistema",
+                message: `${payloadData.senderName} entrou no chat.`,
+                status: "NOTIFICATION"
+            }]);
+        } else if (payloadData.status === "LEAVE") {
+            setConnectedUsers(prevUsers => prevUsers.filter(user => user !== payloadData.senderName));
 
-        // Adiciona uma mensagem de notificação de que o usuário saiu
-        setPublicChats(prevChats => [...prevChats, {
-            senderName: "Sistema",
-            message: `${payloadData.senderName} saiu do chat.`,
-            status: "NOTIFICATION"
-        }]);
-    } else if (payloadData.status === "MESSAGE") {
-        setPublicChats(prevChats => [...prevChats, payloadData]);
-    }
-};
+            setPublicChats(prevChats => [...prevChats, {
+                senderName: "Sistema",
+                message: `${payloadData.senderName} saiu do chat.`,
+                status: "NOTIFICATION"
+            }]);
+        } else if (payloadData.status === "MESSAGE") {
+            setPublicChats(prevChats => [...prevChats, payloadData]);
+        }
+    };
 
-
-    // Função para receber mensagens privadas
     const onPrivateMessage = (payload) => {
         const payloadData = JSON.parse(payload.body);
         const sender = payloadData.senderName;
@@ -323,57 +317,56 @@ const onMessageReceived = (payload) => {
                     {tab === "CHATROOM" && (
                         <div className="chat-content">
                             <ul className="chat-messages">
-    {publicChats.map((chat, index) => {
-        // Verifica se a mensagem ou notificação tem conteúdo válido
-        if (!chat.message && chat.status !== "NOTIFICATION") {
-            return null; // Não renderiza o item se não houver conteúdo
-        }
+                                {publicChats.map((chat, index) => {
+                                    // Verifica se a mensagem ou notificação tem conteúdo válido
+                                    if (!chat.message && chat.status !== "NOTIFICATION") {
+                                        return null; // Não renderiza o item se não houver conteúdo
+                                    }
 
-        return (
-            <li
-                className={`message ${chat.senderName === userData.username ? "self" : ""}`}
-                key={index}
-            >
-                {chat.status === "MESSAGE" ? (
-                    <>
-                        {chat.senderName !== userData.username && (
-                            <div
-                                className="avatar"
-                                style={{
-                                    backgroundColor: avatarColors[chat.senderName],
-                                }}
-                            >
-                                {chat.senderName[0].toUpperCase()}
-                            </div>
-                        )}
-                        <div className="message-info">
-                            <div className="sender-name">{chat.senderName}</div>
-                            <div className="message-data">{chat.message}</div>
-                        </div>
-                        {chat.senderName === userData.username && (
-                            <div
-                                className="avatar self"
-                                style={{
-                                    backgroundColor: avatarColors[userData.username],
-                                }}
-                            >
-                                {chat.senderName[0].toUpperCase()}
-                            </div>
-                        )}
-                    </>
-                ) : (
-                    // Renderiza a notificação apenas se a mensagem não estiver vazia
-                    chat.message && (
-                        <div className="notification">
-                            {chat.message}
-                        </div>
-                    )
-                )}
-            </li>
-        );
-    })}
-</ul>
-
+                                    return (
+                                        <li
+                                            className={`message ${chat.senderName === userData.username ? "self" : ""}`}
+                                            key={index}
+                                        >
+                                            {chat.status === "MESSAGE" ? (
+                                                <>
+                                                    {chat.senderName !== userData.username && (
+                                                        <div
+                                                            className="avatar"
+                                                            style={{
+                                                                backgroundColor: avatarColors[chat.senderName],
+                                                            }}
+                                                        >
+                                                            {chat.senderName[0].toUpperCase()}
+                                                        </div>
+                                                    )}
+                                                    <div className="message-info">
+                                                        <div className="sender-name">{chat.senderName}</div>
+                                                        <div className="message-data">{chat.message}</div>
+                                                    </div>
+                                                    {chat.senderName === userData.username && (
+                                                        <div
+                                                            className="avatar self"
+                                                            style={{
+                                                                backgroundColor: avatarColors[userData.username],
+                                                            }}
+                                                        >
+                                                            {chat.senderName[0].toUpperCase()}
+                                                        </div>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                // Renderiza a notificação apenas se a mensagem não estiver vazia
+                                                chat.message && (
+                                                    <div className="notification">
+                                                        {chat.message}
+                                                    </div>
+                                                )
+                                            )}
+                                        </li>
+                                    );
+                                })}
+                            </ul>
 
                             <div className="send-message">
                                 <input
@@ -397,48 +390,38 @@ const onMessageReceived = (payload) => {
                     {tab !== "CHATROOM" && (
                         <div className="chat-content">
                             <ul className="chat-messages">
-                                {publicChats.map((chat, index) => (
+                                {privateChats.get(tab)?.map((chat, index) => (
                                     <li
                                         className={`message ${chat.senderName === userData.username ? "self" : ""}`}
-                                          key={index}
-                                             >
-                                                 {chat.status === "MESSAGE" ? (
-                                                       <>
-                                             {chat.senderName !== userData.username && (
-                        <div
-                            className="avatar"
-                            style={{
-                                backgroundColor: avatarColors[chat.senderName],
-                            }}
-                        >
-                            {chat.senderName[0].toUpperCase()}
-                        </div>
-                    )}
-                    <div className="message-info">
-                        <div className="sender-name">{chat.senderName}</div>
-                        <div className="message-data">{chat.message}</div>
-                    </div>
-                    {chat.senderName === userData.username && (
-                        <div
-                            className="avatar self"
-                            style={{
-                                backgroundColor: avatarColors[userData.username],
-                            }}
-                        >
-                            {chat.senderName[0].toUpperCase()}
-                        </div>
-                    )}
-                </>
-            ) : (
-                // Exibe notificação de JOIN ou LEAVE
-                <div className="notification">
-                    {chat.message}
-                </div>
-            )}
-        </li>
-    ))}
-</ul>
-
+                                        key={index}
+                                    >
+                                        {chat.senderName !== userData.username && (
+                                            <div
+                                                className="avatar"
+                                                style={{
+                                                    backgroundColor: avatarColors[chat.senderName],
+                                                }}
+                                            >
+                                                {chat.senderName[0].toUpperCase()}
+                                            </div>
+                                        )}
+                                        <div className="message-info">
+                                            <div className="sender-name">{chat.senderName}</div>
+                                            <div className="message-data">{chat.message}</div>
+                                        </div>
+                                        {chat.senderName === userData.username && (
+                                            <div
+                                                className="avatar self"
+                                                style={{
+                                                    backgroundColor: avatarColors[userData.username],
+                                                }}
+                                            >
+                                                {chat.senderName[0].toUpperCase()}
+                                            </div>
+                                        )}
+                                    </li>
+                                )) || <li>Nenhuma mensagem privada encontrada.</li>}
+                            </ul>
 
                             <div className="send-message">
                                 <input
